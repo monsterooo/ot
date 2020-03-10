@@ -1,0 +1,33 @@
+{
+  "name": "ot-demo",
+  "description": "Demo for ot package",
+  "keywords": [
+    "operational transformation",
+    "ot"
+  ],
+  "version": "0.0.14",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/operational-transformation/ot-demo"
+  },
+  "bugs": {
+    "url": "https://github.com/operational-transformation/ot-demo/issues"
+  },
+  "dependencies": {
+    "ot": "0.0.15",
+    "express": "4.11",
+    "morgan": "*",
+    "serve-static": "*",
+    "errorhandler": "*",
+    "socket.io": "1.2.1"
+  },
+  "engines": {
+    "node": "0.10.x"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/github.com/operational-transformation/ot-demo/raw/master/LICENSE"
+    }
+  ]
+}
