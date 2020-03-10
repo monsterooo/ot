@@ -7,6 +7,13 @@
  *    \/ ot may be freely distributed under the MIT license.
  */
 
+/*
+客户端本地状态
+Synchronized 没有正在提交并且等待回包的 operation
+AwaitingConfirm 有一个 operation 提交了但是等后台确认，本地没有编辑数据
+AwaitingWithBuffer 有一个 operation 提交了但是等后台确认，本地有编辑数据
+*/
+
 if (typeof ot === 'undefined') {
   // Export for browsers
   var ot = {};
@@ -26,12 +33,15 @@ ot.TextOperation = (function () {
     // if an imaginary cursor runs over the entire string and skips over some
     // parts, deletes some parts and inserts characters at some positions. These
     // actions (skip/delete/insert) are stored as an array in the "ops" property.
+    // 跳过/删除/插入将以数组的形式存储在ops中
     this.ops = [];
     // An operation's baseLength is the length of every string the operation
     // can be applied to.
+    // 一个操作的baseLength是该操作可以应用到的每个字符串的长度
     this.baseLength = 0;
     // The targetLength is the length of every string that results from applying
     // the operation on a valid input string.
+    // targetLength是在有效输入字符串上应用操作后得出的每个字符串的长度。
     this.targetLength = 0;
   }
 
@@ -89,17 +99,18 @@ ot.TextOperation = (function () {
   };
 
   // Insert a string at the current position.
+  // 在当前位置插入一个字符串
   TextOperation.prototype.insert = function (str) {
     if (typeof str !== 'string') {
       throw new Error("insert expects a string");
     }
     if (str === '') { return this; }
-    this.targetLength += str.length;
+    this.targetLength += str.length; // 增加应用操作的长度
     var ops = this.ops;
-    if (isInsert(ops[ops.length-1])) {
+    if (isInsert(ops[ops.length-1])) { // 如果在这个操作之前也是一个插入操作
       // Merge insert op.
       ops[ops.length-1] += str;
-    } else if (isDelete(ops[ops.length-1])) {
+    } else if (isDelete(ops[ops.length-1])) { // 如果在这个操作之前是一个删除操作
       // It doesn't matter when an operation is applied whether the operation
       // is delete(3), insert("something") or insert("something"), delete(3).
       // Here we enforce that in this case, the insert op always comes first.
@@ -118,6 +129,7 @@ ot.TextOperation = (function () {
   };
 
   // Delete a string at the current position.
+  // 删除当前位置的字符串
   TextOperation.prototype['delete'] = function (n) {
     if (typeof n === 'string') { n = n.length; }
     if (typeof n !== 'number') {
@@ -244,13 +256,19 @@ ot.TextOperation = (function () {
   // preserves the changes of both. Or, in other words, for each input string S
   // and a pair of consecutive operations A and B,
   // apply(apply(S, A), B) = apply(S, compose(A, B)) must hold.
+  /*
+    Compose将两个连续的操作合并为一个操作，从而保留了两者的更改。
+    换句话说，对于每个输入字符串S和一对连续的运算A和B，
+    必须满足apply(apply(S，A)，B)= apply(S，compose(A，B)) 交换律
+  */
   TextOperation.prototype.compose = function (operation2) {
     var operation1 = this;
+    // 如果要和并的操作和当前对象的操作不同步则报错
     if (operation1.targetLength !== operation2.baseLength) {
       throw new Error("The base length of the second operation has to be the target length of the first operation");
     }
 
-    var operation = new TextOperation(); // the combined operation
+    var operation = new TextOperation(); // 组合的operation对象
     var ops1 = operation1.ops, ops2 = operation2.ops; // for fast access
     var i1 = 0, i2 = 0; // current index into ops1 respectively ops2
     var op1 = ops1[i1++], op2 = ops2[i2++]; // current ops
@@ -260,12 +278,13 @@ ot.TextOperation = (function () {
         // end condition: both ops1 and ops2 have been processed
         break;
       }
-
+      // 如果op1是删除操作那么合并op也运用删除并且op1的操作移动到下一个操作
       if (isDelete(op1)) {
         operation['delete'](op1);
         op1 = ops1[i1++];
         continue;
       }
+      // 如果op2是插入操作那么合并op也运用插入操作并且op2的操作移动到下一个操作
       if (isInsert(op2)) {
         operation.insert(op2);
         op2 = ops2[i2++];
@@ -278,8 +297,16 @@ ot.TextOperation = (function () {
       if (typeof op2 === 'undefined') {
         throw new Error("Cannot compose operations: first operation is too long.");
       }
-
+      // op1 & op2都是保持操作(位移)
       if (isRetain(op1) && isRetain(op2)) {
+        // 如果op1的保持操作大于op2(这里说明op2位移的距离更大),那么合并op运用op2的保持，并且op1的保持位置等于op1-op2的位置然后op2移动到下一个操作
+        /*
+          abcdefhghi
+          op1: [4, 'x']
+          op2: [2, 'z']
+          op1 = op1 - op2 = 2
+          op2 = ops2[i2++] = 'z'
+        */
         if (op1 > op2) {
           operation.retain(op2);
           op1 = op1 - op2;
@@ -289,6 +316,7 @@ ot.TextOperation = (function () {
           op1 = ops1[i1++];
           op2 = ops2[i2++];
         } else {
+          // op1 < op2
           operation.retain(op1);
           op2 = op2 - op1;
           op1 = ops1[i1++];
@@ -867,11 +895,13 @@ ot.Client = (function (global) {
   };
 
   // Call this method when the user changes the document.
+  // 当用户更改文档时调用此方法
   Client.prototype.applyClient = function (operation) {
     this.setState(this.state.applyClient(this, operation));
   };
 
   // Call this method with a new operation from the server
+  // 来自服务器的新操作调用此方法
   Client.prototype.applyServer = function (operation) {
     this.revision++;
     this.setState(this.state.applyServer(this, operation));
@@ -909,12 +939,14 @@ ot.Client = (function (global) {
 
   // In the 'Synchronized' state, there is no pending operation that the client
   // has sent to the server.
+  // 没有正在提交并且等待回包的 operation
   function Synchronized () {}
   Client.Synchronized = Synchronized;
 
   Synchronized.prototype.applyClient = function (client, operation) {
     // When the user makes an edit, send the operation to the server and
     // switch to the 'AwaitingConfirm' state
+    // 当用户进行编辑时，将操作发送到服务器并切换到“AwaitingConfirm”状态(有一个 operation 提交了但是等后台确认，本地没有编辑数据)
     client.sendOperation(client.revision, operation);
     return new AwaitingConfirm(operation);
   };
@@ -1181,22 +1213,23 @@ ot.CodeMirrorAdapter = (function (global) {
 
       // 创建一个Operation对象
       operation = new TextOperation()
-        .retain(fromIndex) // 保持在变更开始位置
-        ['delete'](sumLengths(change.removed))
-        .insert(change.text.join('\n'))
-        .retain(restLength)
-        .compose(operation);
+        .retain(fromIndex) // 保持位置在变更开始位置
+        ['delete'](sumLengths(change.removed)) // 删除文本
+        .insert(change.text.join('\n')) // 插入文本
+        .retain(restLength) // 保持在文档的末尾
+        .compose(operation); // 组合这些操作
 
+      // 逆向操作
       inverse = inverse.compose(new TextOperation()
-        .retain(fromIndex)
-        ['delete'](sumLengths(change.text))
-        .insert(change.removed.join('\n'))
-        .retain(restLength)
+        .retain(fromIndex) // 开始变更位置
+        ['delete'](sumLengths(change.text)) // 删除插入的文本
+        .insert(change.removed.join('\n')) // 插入删除的文本
+        .retain(restLength) // 保持在文本的末尾
       );
-
+      // 计算最终的文档长度
       docEndLength += sumLengths(change.removed) - sumLengths(change.text);
     }
-
+    // 返回正向操作和逆操作op
     return [operation, inverse];
   };
 
@@ -1205,6 +1238,7 @@ ot.CodeMirrorAdapter = (function (global) {
     CodeMirrorAdapter.operationFromCodeMirrorChanges;
 
   // Apply an operation to a CodeMirror instance.
+  // 将操operation用于CodeMirror实例
   CodeMirrorAdapter.applyOperationToCodeMirror = function (operation, cm) {
     cm.operation(function () {
       var ops = operation.ops;
@@ -1825,17 +1859,21 @@ ot.EditorClient = (function () {
     if (!this.undoManager.canRedo()) { return; }
     this.undoManager.performRedo(function (o) { self.applyUnredo(o); });
   };
-
+  /**
+   * 编辑器触发change事件封装完op正向操作和逆操作后调用更新
+   * @param {object} textOperation 编辑器更改封装op的正向操作
+   * @param {object} inverse 编辑器更改封装op的逆向操作
+   */
   EditorClient.prototype.onChange = function (textOperation, inverse) {
-    var selectionBefore = this.selection;
-    this.updateSelection();
-    var meta = new SelfMeta(selectionBefore, this.selection);
-    var operation = new WrappedOperation(textOperation, meta);
+    var selectionBefore = this.selection; // 保持编辑器选择范围
+    this.updateSelection(); // 获取新的编辑器选择范围保存到this.selection中
+    var meta = new SelfMeta(selectionBefore, this.selection); // 保存选择前和选择后的范围对象信息
+    var operation = new WrappedOperation(textOperation, meta); // 包装正向操作
 
-    var compose = this.undoManager.undoStack.length > 0 &&
+    var compose = this.undoManager.undoStack.length > 0 && // 如果有可撤销数据
       inverse.shouldBeComposedWithInverted(last(this.undoManager.undoStack).wrapped);
-    var inverseMeta = new SelfMeta(this.selection, selectionBefore);
-    this.undoManager.add(new WrappedOperation(inverse, inverseMeta), compose);
+    var inverseMeta = new SelfMeta(this.selection, selectionBefore); // 反向选择信息
+    this.undoManager.add(new WrappedOperation(inverse, inverseMeta), compose); // 记录反向信息
     this.applyClient(textOperation);
   };
 
