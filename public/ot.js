@@ -1091,6 +1091,11 @@ ot.CodeMirrorAdapter = (function (global) {
     this.cm.off('blur', this.onBlur);
   };
 
+  /**
+   * 比较位置ab,如果a位置小于b位置返回-1，a位置大于b位置返回1，等于则返回0
+   * @param {*} a 
+   * @param {*} b 
+   */
   function cmpPos (a, b) {
     if (a.line < b.line) { return -1; }
     if (a.line > b.line) { return 1; }
@@ -1099,11 +1104,12 @@ ot.CodeMirrorAdapter = (function (global) {
     return 0;
   }
   function posEq (a, b) { return cmpPos(a, b) === 0; }
-  function posLe (a, b) { return cmpPos(a, b) <= 0; }
+  function posLe (a, b) { return cmpPos(a, b) <= 0; } // 位置比较小于或等于
 
   function minPos (a, b) { return posLe(a, b) ? a : b; }
   function maxPos (a, b) { return posLe(a, b) ? b : a; }
 
+  // 获取Codemirror文档字符长度
   function codemirrorDocLength (doc) {
     return doc.indexFromPos({ line: doc.lastLine(), ch: 0 }) +
       doc.getLine(doc.lastLine()).length;
@@ -1125,11 +1131,11 @@ ot.CodeMirrorAdapter = (function (global) {
     // A disadvantage of this approach is its complexity `O(n^2)` in the length
     // of the linked list of changes.
 
-    var docEndLength = codemirrorDocLength(doc);
+    var docEndLength = codemirrorDocLength(doc); // 文档字符长度
     var operation    = new TextOperation().retain(docEndLength);
     var inverse      = new TextOperation().retain(docEndLength);
 
-    // 根据{line, ch}查找字符串位置
+    // 根据post=>{line, ch}查找字符串位置
     var indexFromPos = function (pos) {
       return doc.indexFromPos(pos);
     };
@@ -1169,11 +1175,13 @@ ot.CodeMirrorAdapter = (function (global) {
       var change = changes[i];
       indexFromPos = updateIndexFromPos(indexFromPos, change);
 
-      var fromIndex = indexFromPos(change.from);
+      var fromIndex = indexFromPos(change.from); // 得到编辑from在文档中的位置
+      // 文档字符总长度-更改起始位置-变更文本总长度 = 剩余文本长度
       var restLength = docEndLength - fromIndex - sumLengths(change.text);
 
+      // 创建一个Operation对象
       operation = new TextOperation()
-        .retain(fromIndex)
+        .retain(fromIndex) // 保持在变更开始位置
         ['delete'](sumLengths(change.removed))
         .insert(change.text.join('\n'))
         .retain(restLength)
@@ -1234,7 +1242,18 @@ ot.CodeMirrorAdapter = (function (global) {
 
   CodeMirrorAdapter.prototype.onChanges = function (_, changes) {
     if (!this.ignoreNextChange) {
-      debugger;
+      /*
+        changes => [
+          {
+            from: CodeMirror.Pos {line: 5, ch: 0}
+            to: CodeMirror.Pos {line: 5, ch: 0}
+            text: ["b"]
+            removed: [""]
+            origin: "+input"
+          }
+        ]
+        cm => CodeMirror Instance
+      */
       var pair = CodeMirrorAdapter.operationFromCodeMirrorChanges(changes, this.cm);
       this.trigger('change', pair[0], pair[1]);
     }
