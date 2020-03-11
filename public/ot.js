@@ -1162,7 +1162,7 @@ ot.CodeMirrorAdapter = (function (global) {
     // pre-change coordinate system for all changes in the linked list.
     // A disadvantage of this approach is its complexity `O(n^2)` in the length
     // of the linked list of changes.
-
+    debugger
     var docEndLength = codemirrorDocLength(doc); // 文档字符长度
     var operation    = new TextOperation().retain(docEndLength);
     var inverse      = new TextOperation().retain(docEndLength);
