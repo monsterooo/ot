@@ -19,7 +19,7 @@
     "morgan": "*",
     "serve-static": "*",
     "errorhandler": "*",
-    "socket.io": "1.2.1"
+    "socket.io": "2.4.0"
   },
   "engines": {
     "node": "0.10.x"
