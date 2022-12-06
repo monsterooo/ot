@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "ot": "0.0.15",
-    "express": "4.11",
+    "express": "4.18",
     "morgan": "*",
     "serve-static": "*",
     "errorhandler": "*",
